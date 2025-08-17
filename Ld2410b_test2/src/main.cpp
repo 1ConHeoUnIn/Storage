@@ -10,9 +10,7 @@ ld2410 radar;
 
 uint32_t lastReading = 0;
 
-// Ngưỡng năng lượng để xác định người thực sự, ta sẽ điều chỉnh thông số này
-const uint16_t MOVING_ENERGY_THRESHOLD = 100;
-const uint16_t STATIONARY_ENERGY_THRESHOLD = 100;
+
 
 void setup(void)
 {
