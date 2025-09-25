@@ -3,8 +3,8 @@
 
 detect_rssi::detect_rssi()
 {
-    ssid = "Phuc Anh";
-    password ="Anh@@2004";
+    ssid = "Huu Ngan 5G";
+    password ="22222222H";
     rssi_filter = KalmanFilter(0.0, 1.0, 1.0, 0.95); // x, p , r, a
 }
 void detect_rssi::begin()
