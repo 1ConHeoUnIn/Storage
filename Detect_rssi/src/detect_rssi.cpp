@@ -3,7 +3,7 @@
 
 detect_rssi::detect_rssi()
 {
-    ssid = "hehe";
+    ssid = "pa";
     password = "12345678";
 }
 void detect_rssi::begin()

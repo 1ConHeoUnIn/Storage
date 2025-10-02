@@ -32,6 +32,7 @@ int start_heading =0;
         
 }
 
+
     Serial.println("Đã cập nhật hướng tốt nhất.");
 }
 
@@ -40,11 +41,11 @@ void first_scan()
 
     start_heading = compass.get_heading();
     int spin =0;
-    while(spin <350)
+    while(spin <200)
     {
 
     xe.turn_left(700);
-    delay(200);
+    delay(500);
 
     xe.stop();
     
@@ -56,10 +57,30 @@ void first_scan()
     check_direction();
     
     int step = (start_heading - current_heading +360 ) % 360 ;
-    start_heading = current_heading;
-    if (step > 0 && step < 45) { // lọc nhiễu, chỉ cộng bước hợp lý
+   
+    if (step > 0 && step < 100) { // lọc nhiễu, chỉ cộng bước hợp lý
         spin += step;
+         start_heading = current_heading;
     }
+    else{
+        xe.stop();
+    Serial.println("Nhiễu từ trường, dừng lại để kiểm tra lại hướng...");
+    
+    // Lặp lại kiểm tra cho đến khi step hợp lý
+    while (step >= 100 || step <= 0) {
+        delay(500); // chờ ổn định từ trường
+        current_heading = compass.get_heading();
+        current_rssi = rssi.get_rssi();
+        check_direction();
+        oled.first_scan_view(current_heading, current_rssi, best_rssi, target, spin);
+
+        step = (start_heading - current_heading + 360) % 360;
+    }
+
+    spin += step;
+    start_heading = current_heading;
+    }
+
     Serial.print("spin: ");
     Serial.println(spin);
     delay(1000);
@@ -69,22 +90,23 @@ void first_scan()
     delay(100);
 }
 
-void left_scan()
+void scan()
 {
-    xe.turn_left(500);
-    delay(2000);
+    xe.turn_left(1000);
+    delay(500);
     xe.stop();
+    check_direction();
     delay(100);
+    xe.turn_right(1000);
+    delay(1000);
+     xe.stop();
+    check_direction();
+    delay(100);
+
+
 
 }
 
-void right_scan()
-{
-    xe.turn_right(500);
-    delay(2000);
-    xe.stop();
-    delay(100);
-}
 
 
 
@@ -144,8 +166,19 @@ else
 
 check_direction();
 
+ if(current_rssi > -50 )
+{
+    xe.stop();
+    
+}
+
+if(current_rssi < best_rssi )
+{
+    best_rssi = -999;
+
+scan();
+}
+
+
 delay(50);
-
-
-
 }
