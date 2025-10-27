@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard IoT của tôi</title>
+
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        /* 1. Thiết lập chung cho cả trang */
+    body {
+        font-family: Arial, sans-serif; /* Đổi phông chữ cho dễ đọc */
+        background-color: #9e288a;     /* Màu nền xám nhạt */
+        display: flex;                 /* Dùng Flexbox để căn giữa */
+        justify-content: center;       /* Căn giữa theo chiều ngang */
+        align-items: center;           /* Căn giữa theo chiều dọc */
+        height: 100vh;                 /* Chiều cao bằng 100% màn hình */
+        margin: 0;                     /* Xóa lề mặc định */
+    }
+
+    /* 2. Trang điểm cho cái "hộp" tên là "card" */
+    .card {
+        background-color: white;      /* Nền màu trắng */
+        padding: 20px 40px;           /* Tạo khoảng đệm bên trong */
+        border-radius: 10px;          /* Bo tròn 4 góc */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Tạo bóng mờ */
+        text-align: center;           /* Căn giữa chữ trong thẻ */
+        min-width: 300px;             /* Chiều rộng tối thiểu */
+    }
+
+    /* 3. Trang điểm cho tiêu đề H1 */
+    .card h1 {
+        color: #333; /* Màu chữ xám đậm */
+        margin-bottom: 25px; /* Khoảng cách với dòng dưới */
+    }
+
+    /* 4. Trang điểm cho đoạn văn bản "Nhiệt độ:" */
+    .card p {
+        font-size: 20px; /* Cỡ chữ to hơn */
+        color: #555;     /* Màu chữ xám */
+    }
+
+    /* 5. Trang điểm cho con số (phần quan trọng nhất) */
+    .so-lieu {
+        font-size: 60px;          /* Cỡ chữ CỰC LỚN */
+        font-weight: bold;        /* In đậm */
+        color: #007bff;           /* Màu xanh dương */
+        display: block;           /* Cho nó nằm riêng 1 hàng */
+        margin-top: 10px;         /* Khoảng cách với chữ "Nhiệt độ" */
+    }
+    /* 6. Trang điểm cho phần Cài đặt (MỚI) */
+    .settings {
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee; /* Thêm 1 đường kẻ mờ */
+        padding-bottom: 20px;
+    }
+    .input-group {
+        margin-bottom: 10px;
+        text-align: left;
+    }
+    .input-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: #555;
+    }
+    .input-group input {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box; /* Quan trọng: để padding không làm vỡ layout */
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    /* 7. Trang điểm Nút và Trạng thái (MỚI) */
+    #connect-btn {
+        width: 100%;
+        padding: 10px;
+        background-color: #007bff; /* Màu xanh dương */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer; /* Biến thành hình bàn tay khi di chuột */
+    }
+    #connect-btn:hover {
+        background-color: #0056b3; /* Màu xanh đậm hơn khi di chuột */
+    }
+    #connection-status {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #333;
+    }
+    </style>
+</head>
+<body>
+<div class="card">
+        <h1>Bảng điều khiển IoT</h1>
+
+       <div class="settings">
+    
+    <div class="input-group">
+        <label for="mqtt-server">MQTT Server:</label>
+        <input type="text" id="mqtt-server" placeholder="your-host.hivemq.cloud">
+    </div>
+    <div class="input-group">
+        <label for="mqtt-port">Port:</label>
+        <input type="number" id="mqtt-port" value="8883">
+    </div>
+    <div class="input-group">
+        <label for="mqtt-user">Username:</label>
+        <input type="text" id="mqtt-user" placeholder="Nhập username...">
+    </div>
+    <div class="input-group">
+        <label for="mqtt-pass">Password:</label>
+        <input type="password" id="mqtt-pass" placeholder="Nhập password...">
+    </div>
+    <div class="input-group">
+        <label for="topic-name">Topic:</label>
+        <input type="text" id="topic-name" placeholder="sensors/topic">
+    </div>
+    
+    <button id="connect-btn">Kết nối</button>
+    <p id="connection-status"></p>
+</div>
+<div class="data-display">
+    <p>
+        dữ liệu: 
+        <span id="du-lieu" class="so-lieu">--</span> 
+    </p>
+</div>
+
+    <script>
+    /// Biến client toàn cục
+    let client = null; 
+
+    // Lấy các phần tử giao diện
+    const connectBtn = document.getElementById('connect-btn');
+    const statusElement = document.getElementById('connection-status');
+    const dataElement = document.getElementById('du-lieu');
+
+    // === MỚI: Lấy 5 ô input ===
+    const serverInput = document.getElementById('mqtt-server');
+    const portInput = document.getElementById('mqtt-port');
+    const userInput = document.getElementById('mqtt-user');
+    const passInput = document.getElementById('mqtt-pass');
+    const topicInput = document.getElementById('topic-name');
+
+    // Gán hành động cho nút "Kết nối"
+    connectBtn.addEventListener('click', () => {
+        // 1. Lấy giá trị từ 5 ô input
+        const SERVER = serverInput.value;
+        const PORT = portInput.value;
+        const TOPIC = topicInput.value;
+        const USERNAME = userInput.value;
+        const PASSWORD = passInput.value;
+
+        // --- 2. XÂY DỰNG URL KẾT NỐI ---
+        // Chúng ta cần tự quyết định dùng 'ws://' hay 'wss://'
+        // Quy tắc chung: Port 8883 (MQTTS) sẽ dùng 'wss://' (WebSocket Secure)
+        // Các port khác (như 8000) sẽ dùng 'ws://'
+        const protocol = (PORT == 8884) ? 'wss' : 'ws';
+
+        // Ghép URL lại. HiveMQ Cloud thường cần '/mqtt' ở cuối
+        const BROKER_URL = `${protocol}://${SERVER}:${PORT}/mqtt`;
+
+        // 3. Reset giao diện
+        dataElement.innerText = '--';
+        statusElement.innerText = 'Đang kết nối đến ' + BROKER_URL + '...';
+
+        // 4. Ngắt kết nối cũ (nếu có)
+        if (client) {
+            client.end(() => {
+                console.log('Đã ngắt kết nối cũ.');
+                performConnect(BROKER_URL, TOPIC, USERNAME, PASSWORD);
+            });
+        } else {
+            performConnect(BROKER_URL, TOPIC, USERNAME, PASSWORD);
+        }
+    });
+
+    // --- 5. HÀM KẾT NỐI CHÍNH ---
+    // Hàm này giữ nguyên, không cần thay đổi
+    function performConnect(brokerUrl, topic, username, password) {
+        
+        const options = {
+            username: username,
+            password: password,
+            clean: true,
+            connectTimeout: 4000 
+        };
+
+        console.log('Đang kết nối với options:', options);
+        client = mqtt.connect(brokerUrl, options); 
+
+        // Các hàm .on('connect'), .on('message'), .on('error')...
+        // giữ nguyên y hệt như code cũ
+        
+        // ... (Sao chép toàn bộ các hàm client.on(...) từ code cũ của bạn vào đây) ...
+
+        // --- XỬ LÝ KẾT NỐI THÀNH CÔNG ---
+        client.on('connect', () => {
+            console.log('✅ Đã kết nối thành công!');
+            statusElement.innerText = '✅ Kết nối thành công!';
+            
+            client.subscribe(topic, (err) => {
+                if (!err) {
+                    console.log(`✅ Đã subscribe thành công topic: ${topic}`);
+                    statusElement.innerText = `✅ Đã kết nối và đang lắng nghe topic: ${topic}`;
+                } else {
+                    console.error('Subscribe thất bại:', err);
+                    statusElement.innerText = 'Lỗi: Subscribe thất bại.';
+                }
+            });
+        });
+
+        // --- XỬ LÝ KHI NHẬN ĐƯỢC TIN NHẮN ---
+        client.on('message', (receivedTopic, message) => {
+            const data = message.toString();
+            console.log(`Tin nhắn mới từ topic ${receivedTopic}: ${data}`);
+            dataElement.innerText = data;
+        });
+
+        // --- XỬ LÝ CÁC LỖI KHÁC ---
+        client.on('error', (err) => {
+            console.error('Lỗi MQTT:', err);
+            if (err.message.includes('Not authorized')) {
+                statusElement.innerText = 'Lỗi: Sai Username hoặc Password.';
+            } else {
+                statusElement.innerText = 'Lỗi kết nối. (Xem Console F12)';
+            }
+        });
+
+        client.on('offline', () => {
+            console.warn('⚠️ Mất kết nối broker');
+            statusElement.innerText = '⚠️ Mất kết nối broker.';
+        });
+
+        client.on('reconnect', () => {
+            console.log('Đang thử kết nối lại...');
+            statusElement.innerText = 'Đang thử kết nối lại...';
+        });
+    }
+    </script>
+
+</body>
+</html>
